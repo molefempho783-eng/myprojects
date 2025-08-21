@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "dsquare4.0",
+    "slug": "dsquare4.0",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "scheme": "dsquare",                       
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+        "infoPlist": {
+        "NSCameraUsageDescription": "Allow Dsquare to scan QR codes to send money."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-web-browser",
+      ["expo-camera", { "cameraPermission": "Allow Dsquare to scan QR codes to send money." }]
+                      
+    ]
+  }
+}
