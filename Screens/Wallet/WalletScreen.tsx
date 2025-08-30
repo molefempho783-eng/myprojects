@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useCallback, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -11,20 +11,19 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  StyleSheet,
+  Share,
 } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import * as Haptics from 'expo-haptics';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Linking from 'expo-linking';
+
 import { useTheme } from '../context/ThemeContext';
 import { auth } from '../../firebaseConfig';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getApp } from 'firebase/app';
-// Icons
-import { Ionicons } from '@expo/vector-icons';
 import createStyles from '../context/appStyles';
+import { Ionicons } from '@expo/vector-icons';
 
 type Tx = {
   id: string;
@@ -32,44 +31,98 @@ type Tx = {
   amount: number;
   currency: string;
   note?: string;
-  createdAt: number;
+  createdAt: number; // ms
 };
 
 const functions = getFunctions(getApp(), 'us-central1');
 
+/* -------------------- helpers to normalize backend shapes -------------------- */
+function tsToMs(t: any): number {
+  if (!t) return Date.now();
+  if (typeof t === 'number') return t < 1e12 ? t * 1000 : t; // seconds → ms
+  if (typeof t === 'string') {
+    const ms = Date.parse(t);
+    return Number.isFinite(ms) ? ms : Date.now();
+  }
+  if (typeof t?.toMillis === 'function') return t.toMillis();
+  if (typeof t?.seconds === 'number') {
+    return t.seconds * 1000 + Math.floor((t.nanoseconds || 0) / 1e6);
+  }
+  return Date.now();
+}
+
+function toNumberAmount(x: any): number {
+  if (x == null) return 0;
+  if (typeof x === 'number') return x;
+  if (typeof x === 'string') {
+    const n = Number(x);
+    return Number.isFinite(n) ? n : 0;
+  }
+  if (typeof x === 'object') {
+    if (typeof x.value === 'number') return x.value;
+    if (typeof x.amount === 'number') return x.amount;
+    if (typeof x.cents === 'number') return x.cents / 100;
+    if (typeof x.minor === 'number') return x.minor / 100;
+  }
+  return 0;
+}
+
+function pickCurrency(x: any, fallback: string): string {
+  const c = x?.currency ?? x?.ccy ?? x ?? fallback ?? 'ZAR';
+  return String(c).toUpperCase();
+}
+
+function pickType(x: any): 'credit' | 'debit' {
+  const s = String(x || '').toLowerCase();
+  return ['debit', 'sent', 'out', 'payment', 'withdrawal'].includes(s) ? 'debit' : 'credit';
+}
+
+function formatMoneySafe(v: any, ccy: string) {
+  const n = toNumberAmount(v);
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: ccy }).format(n);
+  } catch {
+    return `${ccy} ${n.toFixed(2)}`;
+  }
+}
+
+function formatDay(ts: number) {
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '';
+  // e.g. "Sep 5, 2025"
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+
+/* -------------------------------- component -------------------------------- */
 export default function WalletScreen() {
   const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors).WalletScreen, [colors]);
 
   const [balance, setBalance] = useState<number>(0);
   const [baseCurrency, setBaseCurrency] = useState<string>('ZAR');
-  const [amount, setAmount] = useState<string>('50'); // default top-up
+  const [amount, setAmount] = useState<string>('50');
   const [loading, setLoading] = useState<boolean>(false);
 
-  // history
   const [tx, setTx] = useState<Tx[]>([]);
   const [hasMore, setHasMore] = useState<boolean>(false);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
 
-  // QR receive modal
+  // Receive (show my QR)
   const [qrVisible, setQrVisible] = useState<boolean>(false);
-  const [qrAmount, setQrAmount] = useState<string>('');
 
-  // Scanner modal
+  // Scan → Send
   const [scanVisible, setScanVisible] = useState<boolean>(false);
   const [sendVisible, setSendVisible] = useState<boolean>(false);
   const [cameraPerm, requestCameraPerm] = useCameraPermissions();
   const [scanningLocked, setScanningLocked] = useState<boolean>(false);
 
-  // Data from scanned QR
   const [scannedUid, setScannedUid] = useState<string>('');
   const [scannedCurrency, setScannedCurrency] = useState<string>('ZAR');
-  const [scannedAmount, setScannedAmount] = useState<string>('');
+  const [scannedAmount, setScannedAmount] = useState<string>(''); // sender enters this
 
   const uid = auth.currentUser?.uid || '';
 
-  // --- Helpers ---------------------------------------------------------
-  const styles = useMemo(() => createStyles(colors).WalletScreen, [colors]);
-  const globalStyles = useMemo(() => createStyles(colors).global, [colors]);
   const createOrder = httpsCallable(functions, 'createPayPalOrder');
   const captureOrder = httpsCallable(functions, 'capturePayPalOrder');
   const getBalanceFn = httpsCallable(functions, 'getWalletBalance');
@@ -82,9 +135,20 @@ export default function WalletScreen() {
       const [bRes, tRes] = await Promise.all([getBalanceFn({}), getTxFn({ limit: 20 })]);
       const b = (bRes.data as any) || {};
       const t = (tRes.data as any) || {};
-      setBalance(Number(b.balance || 0));
-      setBaseCurrency((b.currency || 'ZAR').toUpperCase());
-      setTx((t.items || []) as Tx[]);
+
+      setBalance(toNumberAmount(b.balance || 0));
+      const walletCcy = pickCurrency(b.currency, 'ZAR');
+      setBaseCurrency(walletCcy);
+
+      const cleaned: Tx[] = (t.items || []).map((raw: any) => ({
+        id: String(raw.id || raw.txId || raw.docId || raw.refId || Math.random()),
+        type: pickType(raw.type),
+        amount: toNumberAmount(raw.amount ?? raw.total ?? raw.value ?? raw.amount_cents),
+        currency: pickCurrency(raw.currency ?? raw.amount?.currency ?? raw.ccy, walletCcy),
+        note: raw.note || raw.description || '',
+        createdAt: tsToMs(raw.createdAt ?? raw.created_at ?? raw.created ?? raw.ts ?? raw.time),
+      }));
+      setTx(cleaned);
       setHasMore(!!t.hasMore);
       setNextCursor(t.nextCursor || null);
     } catch (e: any) {
@@ -96,36 +160,14 @@ export default function WalletScreen() {
     refresh();
   }, [refresh]);
 
-  // FIX: safer formatter (handles undefined/NaN and bad currency)
-  function formatMoney(v: unknown, ccy?: string) {
-    const n = typeof v === 'number' && Number.isFinite(v) ? v : Number(v as any);
-    const curr = (ccy && ccy.length === 3 ? ccy : 'USD').toUpperCase();
-
-    if (!Number.isFinite(n)) return `${curr} 0.00`;
-
-    try {
-      return new Intl.NumberFormat(undefined, {
-        style: 'currency',
-        currency: curr,
-        currencyDisplay: 'narrowSymbol',
-      }).format(n);
-    } catch {
-      return `${curr} ${n.toFixed(2)}`;
-    }
+  function buildQrPayload(): string {
+    // Keep it STABLE: just encode wallet identity (no amount, no timestamp)
+    // Support both JSON and deep link (some scanners show raw text)
+    // We'll use JSON: {"type":"wallet","uid":"...","currency":"ZAR"}
+    return JSON.stringify({ type: 'wallet', uid, currency: baseCurrency });
   }
 
-  function buildQrPayload() {
-    const payload = {
-      type: 'wallet',
-      uid,
-      currency: baseCurrency,
-      ...(qrAmount ? { amount: Number(qrAmount) } : {}),
-      ts: Date.now(),
-    };
-    return JSON.stringify(payload);
-  }
-
-  // --- Top up via PayPal (uses your existing callable flow) -----------
+  /* ------------------------------ PayPal top-up ------------------------------ */
   async function onTopUp() {
     if (!amount || isNaN(Number(amount))) {
       Alert.alert('Invalid amount', 'Enter a valid number');
@@ -136,7 +178,6 @@ export default function WalletScreen() {
       const returnUrl = Linking.createURL('paypal-return');
       const cancelUrl = `${returnUrl}?cancel=true`;
 
-      // 1) create
       const c = await createOrder({
         amount: Number(amount).toFixed(2),
         currency: baseCurrency,
@@ -147,18 +188,15 @@ export default function WalletScreen() {
       const approval =
         d?.approveLinks?.find((l: any) => l.rel === 'approve')?.href ||
         d?.links?.find((l: any) => l.rel === 'approve')?.href;
-      if (!approval) {
-        throw new Error('Missing PayPal approval URL');
-      }
 
-      // 2) open system browser session
+      if (!approval) throw new Error('Missing PayPal approval URL');
+
       const res = await (await import('expo-web-browser')).openAuthSessionAsync(approval, returnUrl);
       if (res.type !== 'success') {
         if (res.type === 'cancel' || res.type === 'dismiss') return;
         throw new Error(`Browser: ${res.type}`);
       }
 
-      // 3) capture
       const parsed = Linking.parse(res.url) as any;
       const token = parsed?.queryParams?.token || d?.orderId || parsed?.queryParams?.orderId;
       if (!token) throw new Error('No orderId from redirect');
@@ -173,7 +211,7 @@ export default function WalletScreen() {
       await refresh();
       Alert.alert(
         'Top-up complete',
-        `Credited ${formatMoney(capData.credited ?? Number(amount), baseCurrency)}`
+        `Credited ${formatMoneySafe(capData.credited || Number(amount), baseCurrency)}`
       );
     } catch (e: any) {
       console.log('Top-up error:', e?.message || e);
@@ -183,13 +221,21 @@ export default function WalletScreen() {
     }
   }
 
-  // --- History pagination ---------------------------------------------
+  /* ----------------------------- History paging ----------------------------- */
   async function loadMore() {
     if (!hasMore || !nextCursor) return;
     try {
       const r = await getTxFn({ limit: 20, cursor: nextCursor });
       const d = (r.data || {}) as any;
-      setTx((prev) => [...prev, ...(d.items || [])]);
+      const more: Tx[] = (d.items || []).map((raw: any) => ({
+        id: String(raw.id || raw.txId || raw.docId || raw.refId || Math.random()),
+        type: pickType(raw.type),
+        amount: toNumberAmount(raw.amount ?? raw.total ?? raw.value ?? raw.amount_cents),
+        currency: pickCurrency(raw.currency ?? raw.amount?.currency ?? raw.ccy, baseCurrency),
+        note: raw.note || raw.description || '',
+        createdAt: tsToMs(raw.createdAt ?? raw.created_at ?? raw.created ?? raw.ts ?? raw.time),
+      }));
+      setTx(prev => [...prev, ...more]);
       setHasMore(!!d.hasMore);
       setNextCursor(d.nextCursor || null);
     } catch (e) {
@@ -197,34 +243,28 @@ export default function WalletScreen() {
     }
   }
 
-  // --- QR: scan to send -----------------------------------------------
+  /* ------------------------------ Scan → Send ------------------------------ */
   function parseScannedData(data: string) {
-    // Try JSON
+    // JSON {"type":"wallet","uid":"...","currency":"ZAR"}
     try {
       const obj = JSON.parse(data);
       if (obj && obj.uid) {
         return {
           uid: String(obj.uid),
-          currency: (obj.currency || baseCurrency || 'ZAR').toUpperCase(),
-          amount: obj.amount ? String(obj.amount) : '',
+          currency: pickCurrency(obj.currency, baseCurrency),
         };
       }
     } catch {}
-    // Try dsquare://pay?to=UID&amount=123
+    // Deep link: dsquare://pay?to=UID
     try {
       const parsed = Linking.parse(data) as any;
       const to = parsed?.queryParams?.to || parsed?.queryParams?.uid;
-      const amt = parsed?.queryParams?.amount;
       if (to) {
-        return {
-          uid: String(to),
-          currency: baseCurrency.toUpperCase(),
-          amount: amt ? String(amt) : '',
-        };
+        return { uid: String(to), currency: baseCurrency.toUpperCase() };
       }
     } catch {}
-    // Fallback: treat entire string as UID
-    return { uid: data, currency: baseCurrency.toUpperCase(), amount: '' };
+    // Fallback: whole string is UID
+    return { uid: data, currency: baseCurrency.toUpperCase() };
   }
 
   const handleScanned = useCallback(
@@ -238,7 +278,7 @@ export default function WalletScreen() {
         const parsed = parseScannedData(String(code));
         setScannedUid(parsed.uid);
         setScannedCurrency(parsed.currency);
-        setScannedAmount(parsed.amount || '');
+        setScannedAmount(''); // sender decides amount
         setScanVisible(false);
         setTimeout(() => setSendVisible(true), 250);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -278,17 +318,13 @@ export default function WalletScreen() {
         note: 'QR payment',
       });
       const d = (r.data || {}) as any;
-      if (d?.status !== 'SUCCESS') {
-        throw new Error(d?.message || 'Transfer failed');
-      }
+      if (d?.status !== 'SUCCESS') throw new Error(d?.message || 'Transfer failed');
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setSendVisible(false);
       setScannedAmount('');
       await refresh();
-      Alert.alert(
-        'Sent',
-        `You sent ${formatMoney(Number(d.debited ?? scannedAmount ?? 0), baseCurrency)}.`
-      );
+      Alert.alert('Sent', `You sent ${formatMoneySafe(d.debited || scannedAmount, baseCurrency)}.`);
     } catch (e: any) {
       console.log('send err:', e?.message || e);
       Alert.alert('Send failed', e?.message || 'Please try again');
@@ -297,30 +333,27 @@ export default function WalletScreen() {
     }
   }
 
-  // --- Render ----------------------------------------------------------
+  /* --------------------------------- render -------------------------------- */
   const renderTx = ({ item }: { item: Tx }) => {
-    const isDebit = item.type === 'debit';
-    const sign = isDebit ? '-' : '+';
-    const color = isDebit ? styles.txAmountNegative : styles.txAmountPositive;
-
+    const sign = item.type === 'debit' ? '-' : '+';
+    const color = item.type === 'debit' ? styles.txAmountNegative : styles.txAmountPositive;
     return (
       <View style={styles.txItem}>
         <View style={styles.txIconWrap}>
-          {/* FIX: use valid Ionicons names */}
           <Ionicons
-            name={isDebit ? 'trending-down' : 'trending-up'}
+            name={item.type === 'debit' ? 'trending-down' : 'trending-up'}
             size={18}
-            color={isDebit ? colors.error : colors.success}
+            color={colors.textPrimary}
           />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.txTitle}>{isDebit ? 'Sent' : 'Received'}</Text>
+          <Text style={styles.txTitle}>{item.type === 'debit' ? 'Sent' : 'Received'}</Text>
           {!!item.note && <Text style={styles.txMeta}>{item.note}</Text>}
-          <Text style={styles.txMeta}>{new Date(item.createdAt).toLocaleString()}</Text>
+          <Text style={styles.txMeta}>{formatDay(item.createdAt)}</Text>
         </View>
         <Text style={[styles.txAmount, color]}>
           {sign}
-          {formatMoney(item.amount, item.currency)}
+          {formatMoneySafe(item.amount, item.currency)}
         </Text>
       </View>
     );
@@ -338,15 +371,13 @@ export default function WalletScreen() {
         </View>
       </View>
 
-      {/* Balance card */}
+      {/* Balance */}
       <View style={styles.balanceCard}>
         <View style={styles.balanceRow}>
           <Text style={styles.balanceLabel}>Available balance</Text>
         </View>
-        <Text style={styles.balanceValue}>{formatMoney(balance, baseCurrency)}</Text>
+        <Text style={styles.balanceValue}>{formatMoneySafe(balance, baseCurrency)}</Text>
         <Text style={styles.balanceSub}>{baseCurrency} Wallet • Secure payments</Text>
-
-        {/* Your user id pill */}
         <View style={styles.idRow}>
           <View style={styles.idPill}>
             <Text style={styles.idPillText} numberOfLines={1}>
@@ -395,12 +426,12 @@ export default function WalletScreen() {
         }
       />
 
-      {/* Floating Scan button */}
+      {/* Scan FAB */}
       <TouchableOpacity style={styles.fab} onPress={openScanner} activeOpacity={0.8}>
         <Ionicons name="scan" size={24} color="#fff" />
       </TouchableOpacity>
 
-      {/* Receive QR modal */}
+      {/* Receive (show my QR) */}
       <Modal visible={qrVisible} transparent animationType="slide">
         <Pressable style={styles.qrBackdrop} onPress={() => setQrVisible(false)}>
           <Pressable style={styles.qrSheet} onPress={() => {}}>
@@ -411,35 +442,15 @@ export default function WalletScreen() {
               <QRCode value={buildQrPayload()} size={180} />
             </View>
 
-            <View style={styles.amountRow}>
-              <Text style={styles.currencyPrefix}>{baseCurrency}</Text>
-              <TextInput
-                style={styles.amountInput}
-                placeholder="Optional amount"
-                placeholderTextColor={colors.placeholderText}
-                keyboardType="decimal-pad"
-                value={qrAmount}
-                onChangeText={setQrAmount}
-              />
-              <TouchableOpacity
-                style={styles.copyBtn}
-                onPress={async () => {
-                  await Clipboard.setStringAsync(uid);
-                  Haptics.selectionAsync();
-                }}
-              >
-                <Ionicons name="copy" size={16} color={colors.textPrimary} />
-                <Text style={styles.copyBtnText}>Copy ID</Text>
-              </TouchableOpacity>
-            </View>
-
             <View style={styles.qrActions}>
               <TouchableOpacity
                 style={styles.qrShareBtn}
                 onPress={async () => {
                   const payload = buildQrPayload();
-                  await Clipboard.setStringAsync(payload);
-                  Alert.alert('Copied', 'QR payload copied to clipboard.');
+                  await Share.share({
+                    message: payload,
+                    title: 'My Dsquare wallet QR',
+                  });
                 }}
               >
                 <Ionicons name="share-social" size={18} color="#fff" />
@@ -453,7 +464,7 @@ export default function WalletScreen() {
         </Pressable>
       </Modal>
 
-      {/* Scanner modal */}
+      {/* Scanner */}
       <Modal visible={scanVisible} transparent animationType="fade">
         <View style={styles.scannerModal}>
           <CameraView
@@ -471,7 +482,7 @@ export default function WalletScreen() {
         </View>
       </Modal>
 
-      {/* Send confirm modal (after scan) */}
+      {/* Send confirm (sender enters amount) */}
       <Modal visible={sendVisible} transparent animationType="slide">
         <Pressable style={styles.qrBackdrop} onPress={() => setSendVisible(false)}>
           <Pressable style={styles.sendModalCard} onPress={() => {}}>
@@ -504,5 +515,3 @@ export default function WalletScreen() {
     </SafeAreaView>
   );
 }
-
-
