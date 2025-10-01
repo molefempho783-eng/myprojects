@@ -5,6 +5,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define the shape of our theme colors
 export interface ThemeColors {
+  cardHighlight: string;
+  card: string;
+  muted: string;
   icon: any;
   buttonText: any;
   border: any;
@@ -32,68 +35,95 @@ export interface ThemeColors {
   success: string; // Added for completeness, if you use it later
   warning: string; // Added for completeness, if you use it later
   info: string;   // Added for completeness, if you use it later
+// + add these keys
+inputBg: string;
+inputBorder: string;
+
 }
 
 // Define the light and dark theme color palettes
 const lightColors: ThemeColors = {
   background: '#f0f2f5',
   cardBackground: '#ffffff',
-  surface: '#ffffff', // Explicitly defined
-  text: '#333333',
-  secondaryText: '#666666',
-  placeholderText: '#888888',
-  borderColor: '#e0e0e0',
+  surface: '#ffffff',
+  text: '#111827',
+  textPrimary: '#111827',
+  secondaryText: '#4B5563',
+  placeholderText: '#6B7280',
+  borderColor: '#E5E7EB',
   shadowColor: '#000000',
-  primary: '#6200EE', // Deep Purple
-  primaryDark: '#3700B3', // Darker shade of primary
-  primaryLight: '#BB86FC', // Lighter shade of primary, used for my messages
-  accent: '#03DAC6', // Teal
-  textPrimary: '#333333', // Alias for text
-  link: '#2196F3', // Blue for links
-  error: '#B00020', // Red for errors
-  placeholder: '#BDBDBD', // Grey for placeholders
-  filterButtonBackground: '#e0e0e0',
-  activeFilterBackground: '#6200EE',
+
+  primary: '#2563EB',
+  primaryDark: '#1E40AF',
+  primaryLight: '#93C5FD',
+  accent: '#03DAC6',
+
+  link: '#1D4ED8',
+  error: '#B00020',
+  placeholder: '#E5E7EB',
+
+  filterButtonBackground: '#E5E7EB',
+  activeFilterBackground: '#2563EB',
   activeFilterText: '#ffffff',
-  success: '#4CAF50',
-  warning: '#FFC107',
-  info: '#2196F3',
-  textSecondary: '#666666',
-  secondary: '#666666',
-  icon: undefined,
-  buttonText: undefined,
-  border: undefined
+
+  success: '#16A34A',
+  warning: '#F59E0B',
+  info: '#0284C7',
+
+  // ==== keys used by e-hailing styles ====
+  icon: '#111827',
+  buttonText: '#ffffff',
+  border: '#E5E7EB',
+  card: '#FFFFFF',
+  muted: '#6B7280',
+  cardHighlight: '#EFF6FF',
+  inputBg: '#FFFFFF', // TextInput background
+  inputBorder: '#94A3B8',
+  secondary: '',
+  textSecondary: ''
 };
 
 const darkColors: ThemeColors = {
   background: '#121212',
   cardBackground: '#1e1e1e',
-  surface: '#1e1e1e', // Explicitly defined (same as cardBackground for consistency)
-  text: '#e0e0e0',
-  secondaryText: '#a0a0a0',
-  placeholderText: '#777777',
+  surface: '#1e1e1e',
+  text: '#E0E0E0',
+  textPrimary: '#E0E0E0',
+  secondaryText: '#A3A3A3',
+  placeholderText: '#9CA3AF',
   borderColor: '#333333',
   shadowColor: '#000000',
-  primary: '#BB86FC', // Lighter purple accent for dark mode
-  primaryDark: '#794BC4', // Darker shade for dark primary
-  primaryLight: 'rgb(59, 26, 135)', // Even lighter shade for dark mode messages
+
+  primary: '#BB86FC',
+  primaryDark: '#794BC4',
+  primaryLight: 'rgb(59, 26, 135)',
   accent: '#03DAC6',
-  textPrimary: '#E0E0E0', // Alias for text
-  link: '#90CAF9', // Lighter blue for links in dark mode
-  error: '#CF6679', // Lighter red for errors in dark mode
-  placeholder: '#555555', // Darker grey for placeholders in dark mode
-  filterButtonBackground: '#2a2a2a',
+
+  link: '#90CAF9',
+  error: '#CF6679',
+  placeholder: '#2A2A2A',
+
+  filterButtonBackground: '#2A2A2A',
   activeFilterBackground: '#BB86FC',
-  activeFilterText: '#121212', // Dark text on light background in dark mode
+  activeFilterText: '#121212',
+
   success: '#66BB6A',
   warning: '#FFEB3B',
   info: '#64B5F6',
-  textSecondary: '#a0a0a0',
-  secondary: '#a0a0a0',
-  icon: undefined,
-  buttonText: undefined,
-  border: undefined
+
+  // ==== keys used by e-hailing styles ====
+  icon: '#E0E0E0',
+  buttonText: '#FFFFFF',
+  border: '#333333',
+  card: '#1e1e1e',
+  muted: '#9CA3AF',
+  cardHighlight: '#2C2F3A',
+  inputBg: '#1e1e1e',
+  inputBorder: '#4B5563',
+  secondary: '',
+  textSecondary: ''
 };
+
 
 // Define the context type
 interface ThemeContextType {

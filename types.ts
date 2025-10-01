@@ -50,9 +50,19 @@ EditBusinessScreen: {
   catalog?: CatalogItem[];
 };
 
+  EHailingScreen: undefined;
+  BeADriverScreen: undefined;
+  
     // BOTTOM TABS (used in App.tsx as a screen name)
     BottomTabs: undefined;
     Auth: undefined;
+
+    ShopScreen: {
+  businessId?: string;
+  businessName?: string;
+  catalog?: CatalogItem[];
+};
+
 };
 
 
@@ -95,6 +105,7 @@ export interface Message { // Changed to interface for consistency and extensibi
 
 // NEW: Business Data Models
 export interface CatalogItem {
+  id?: string;  
   tempId?: string; // Client-side only: Temporary ID for items before saving to Firestore
   name: string;
   price: number; // Store as number for calculations
@@ -103,6 +114,9 @@ export interface CatalogItem {
   uploading?: boolean;
   uploadProgress?: number; // 0-100
   uploadError?: string;
+   quantity?: number;
+  category?: string;
+
 }
 
 export interface Business {

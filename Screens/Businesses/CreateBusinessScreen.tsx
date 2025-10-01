@@ -29,7 +29,7 @@ const CreateBusinessScreen = () => {
   const [description, setDescription] = useState('');
   const [type, setType] = useState<string | null>(null);
   const [location, setLocation] = useState('');
-  const [imageUri, setImageUri] = useState<string | null>(null); // CHANGED from coverImageUri to imageUri
+  const [imageUri, setImageUri] = useState<string | null>(null); // use imageUri for cover
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -38,19 +38,24 @@ const CreateBusinessScreen = () => {
   const [items, setItems] = useState([
     { label: 'Restaurant', value: 'Restaurant' },
     { label: 'Cafe', value: 'Cafe' },
-    // ...more items
     { label: 'Hardware Store', value: 'Hardware Store' },
   ]);
 
+  // ⬇️ FIXED: guard route.params?.catalog, correct braces, normalize fields
   useEffect(() => {
     if (route.params?.catalog) {
-      const parsed = route.params.catalog.map(item => ({
-        ...item,
-        price: typeof item.price === 'string' ? parseFloat(item.price) : item.price
+      const parsed: CatalogItem[] = route.params.catalog.map((item: any) => ({
+        id: item.id, // optional
+        name: item.name ?? '',
+        price: typeof item.price === 'number' ? item.price : Number(item.price || 0),
+        description: item.description ?? '',
+        imageUrl: item.imageUrl ?? item.imageUri ?? undefined,
+        quantity: typeof item.quantity === 'number' ? item.quantity : Number(item.quantity ?? 1),
+        category: (item.category ?? '').trim(),
       }));
       setCatalog(parsed);
     }
-  }, [route.params]);
+  }, [route.params?.catalog]);
 
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -86,7 +91,8 @@ const CreateBusinessScreen = () => {
     setLoading(true);
 
     try {
-      let businessImageUrl = null;
+      // upload cover if provided
+      let businessImageUrl: string | null = null;
       if (imageUri) {
         businessImageUrl = await uploadImageToFirebase(
           imageUri,
@@ -94,9 +100,10 @@ const CreateBusinessScreen = () => {
         );
       }
 
+      // upload catalog item images + keep quantity/category
       const catalogWithImages = [];
       for (const item of catalog) {
-        let itemImageUrl = null;
+        let itemImageUrl: string | null = null;
         if (item.imageUrl) {
           itemImageUrl = await uploadImageToFirebase(
             item.imageUrl,
@@ -105,9 +112,11 @@ const CreateBusinessScreen = () => {
         }
         catalogWithImages.push({
           name: item.name,
-          price: item.price,
+          price: Number(item.price) || 0,
           description: item.description || '',
-          imageUrl: itemImageUrl, // standardize as imageUrl
+          imageUrl: itemImageUrl,                 // standardize as imageUrl
+          quantity: Number(item.quantity ?? 1),   // ✅ preserve quantity
+          category: (item.category ?? '').trim(), // ✅ preserve category
         });
       }
 
@@ -116,8 +125,8 @@ const CreateBusinessScreen = () => {
         description,
         type,
         location,
-        imageUrl: businessImageUrl, // <-- use imageUrl everywhere!
-        catalog: catalogWithImages,
+        imageUrl: businessImageUrl, // cover
+        catalog: catalogWithImages, // array of items (with qty/category)
         ownerId: auth.currentUser?.uid,
         createdAt: serverTimestamp()
       });
@@ -146,7 +155,6 @@ const CreateBusinessScreen = () => {
         nestedScrollEnabled
         showsVerticalScrollIndicator={true}
       >
-
         <Text style={styles.header}>Create Business</Text>
 
         {loading && (
@@ -157,6 +165,7 @@ const CreateBusinessScreen = () => {
         <TextInput
           style={styles.input}
           placeholder="Enter business name"
+          placeholderTextColor={colors.placeholderText}
           value={name}
           onChangeText={setName}
         />
@@ -165,6 +174,7 @@ const CreateBusinessScreen = () => {
         <TextInput
           style={styles.input}
           placeholder="Enter description"
+          placeholderTextColor={colors.placeholderText}
           value={description}
           onChangeText={setDescription}
         />
@@ -175,30 +185,15 @@ const CreateBusinessScreen = () => {
           value={type}
           items={items}
           setOpen={setOpen}
-          setValue={setType}
+          setValue={setType as any}   // keep simple; works at runtime
           setItems={setItems}
           placeholder="Select business type"
-          style={{
-            borderColor: colors.borderColor,
-            backgroundColor: colors.cardBackground,
-          }}
-          dropDownContainerStyle={{
-            borderColor: colors.borderColor,
-            backgroundColor: colors.surface,
-          }}
-          placeholderStyle={{
-            color: colors.placeholderText,
-          }}
-          labelStyle={{
-            color: colors.textPrimary,
-          }}
-          selectedItemLabelStyle={{
-            fontWeight: 'bold',
-            color: colors.primary,
-          }}
-          listItemLabelStyle={{
-            color: colors.textPrimary,
-          }}
+          style={{ borderColor: colors.borderColor, backgroundColor: colors.cardBackground }}
+          dropDownContainerStyle={{ borderColor: colors.borderColor, backgroundColor: colors.surface }}
+          placeholderStyle={{ color: colors.placeholderText }}
+          labelStyle={{ color: colors.textPrimary }}
+          selectedItemLabelStyle={{ fontWeight: 'bold', color: colors.primary }}
+          listItemLabelStyle={{ color: colors.textPrimary }}
           ArrowUpIconComponent={({ style }) => (
             <Ionicons name="chevron-up" size={20} color={colors.primary} style={style as any} />
           )}
@@ -214,6 +209,7 @@ const CreateBusinessScreen = () => {
         <TextInput
           style={styles.input}
           placeholder="Enter location"
+          placeholderTextColor={colors.placeholderText}
           value={location}
           onChangeText={setLocation}
         />
@@ -227,26 +223,9 @@ const CreateBusinessScreen = () => {
           )}
         </TouchableOpacity>
 
-        <Text style={styles.sectionHeader}>Catalog / Menu Items</Text>
-        {catalog.length === 0 && (
-          <Text style={styles.catalogDescription}>No items yet. Tap below to add.</Text>
-        )}
-        {catalog.map((item, index) => (
-          <View key={index} style={styles.catalogItem}>
-            {item.imageUrl ? (
-              <Image source={{ uri: item.imageUrl }} style={styles.catalogItemImage} />
-            ) : (
-              <Ionicons name="image-outline" size={FONT_SIZES.large} color={colors.primary} />
-            )}
-            <View style={styles.catalogItemTextContainer}>
-              <Text style={styles.catalogItemName}>{item.name} - ${item.price.toFixed(2)}</Text>
-              <Text style={styles.catalogItemDescription}>{item.description}</Text>
-            </View>
-          </View>
-        ))}
-        <TouchableOpacity onPress={openAddCatalog} style={styles.addButton}>
-          <Text style={styles.addButtonText}>Add / Edit Catalog Items</Text>
-        </TouchableOpacity>
+        
+
+
 
         <TouchableOpacity onPress={handleSubmit} style={styles.submitButton} disabled={loading}>
           <Text style={styles.submitButtonText}>Create Business</Text>

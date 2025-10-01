@@ -43,6 +43,7 @@ const ProfileScreen = () => {
   const [socialLink, setSocialLink] = useState("");
   const [aboutMe, setAboutMe] = useState("");
   const [loading, setLoading] = useState(false); 
+  const [username, setUsername] = useState<string>("");
 
   const [isProfileDataLoading, setIsProfileDataLoading] = useState(true); 
 
@@ -54,6 +55,23 @@ const ProfileScreen = () => {
        navigation.navigate("AuthScreen");
     }
   }, [user, navigation]); 
+
+  useEffect(() => {
+  let mounted = true;
+  (async () => {
+    if (!user) return;
+    try {
+      const snap = await getDoc(doc(db, "users", user.uid));
+      const fromDb = snap.exists() ? (snap.data() as any)?.username : undefined;
+      const fallback = user.displayName || user.email?.split("@")[0] || "User";
+      if (mounted) setUsername(fromDb || fallback);
+    } catch {
+      const fallback = user?.displayName || user?.email?.split("@")[0] || "User";
+      if (mounted) setUsername(fallback);
+    }
+  })();
+  return () => { mounted = false; };
+}, [user]);
 
   const fetchUserProfile = async () => {
     if (!user) return; 
@@ -202,6 +220,12 @@ const ProfileScreen = () => {
           <Text style={styles.changePicText}>Change Profile Picture</Text>
         </TouchableOpacity>
 
+<View style={styles.inputSection}>
+  <Text style={styles.label}>Username</Text>
+  <Text style={[styles.textInput, { paddingVertical: 12 }]}>
+    {username || "User"}
+  </Text>
+</View>
         <View style={styles.inputSection}>
           <Text style={styles.label}>Social Link (optional)</Text>
           <TextInput

@@ -1,7 +1,7 @@
 // Screens/context/appStyles.ts
 import { StyleSheet, Platform, Dimensions } from 'react-native';
 import { ThemeColors } from './ThemeContext'; // Ensure this import path is correct
-import WalletScreen from '../Wallet/WalletScreen';
+const { width, height } = Dimensions.get("window");
 
 export const BOTTOM_TAB_BAR_HEIGHT = 70; // Adjust this value precisely if needed
 
@@ -669,6 +669,38 @@ communityDetailScreen: StyleSheet.create({
         backgroundColor: colors.background,
         paddingHorizontal: SPACING.medium,
       },
+
+         memberItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: SPACING.small,
+        paddingVertical: SPACING.xsmall,
+        paddingHorizontal: SPACING.small,
+        backgroundColor: colors.background,
+        borderRadius: SPACING.small,
+      },
+      memberAvatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        marginRight: SPACING.medium,
+        backgroundColor: colors.placeholder,
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+      memberAvatarFallback: {
+        backgroundColor: colors.secondary,
+      },
+      memberAvatarFallbackText: {
+        color: colors.buttonText,
+        fontSize: FONT_SIZES.medium,
+        fontWeight: 'bold',
+      },
+      memberName: {
+        fontSize: FONT_SIZES.medium,
+        color: colors.textPrimary,
+        fontWeight: '500',
+      },
     }),
 
 createBusinessScreen: StyleSheet.create({
@@ -676,6 +708,10 @@ createBusinessScreen: StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+// appStyles.ts (inside createBusinessScreen)
+inputGroup: {
+  marginBottom: 12,
+},
 
 scrollContent: {
   flexGrow: 1,
@@ -2388,6 +2424,38 @@ inputContainer: {
     color: colors.textPrimary,
     textAlign: 'center',
   },
+
+   memberItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: SPACING.small,
+        paddingVertical: SPACING.xsmall,
+        paddingHorizontal: SPACING.small,
+        backgroundColor: colors.background,
+        borderRadius: SPACING.small,
+      },
+      memberAvatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        marginRight: SPACING.medium,
+        backgroundColor: colors.placeholder,
+        justifyContent: 'center',
+        alignItems: 'center',
+      },
+      memberAvatarFallback: {
+        backgroundColor: colors.secondary,
+      },
+      memberAvatarFallbackText: {
+        color: colors.buttonText,
+        fontSize: FONT_SIZES.medium,
+        fontWeight: 'bold',
+      },
+      memberName: {
+        fontSize: FONT_SIZES.medium,
+        color: colors.textPrimary,
+        fontWeight: '500',
+      },
 }),
 
 businessChatScreen: StyleSheet.create({
@@ -2921,13 +2989,256 @@ flatListStyle: {
 }),
 
 
+
+
+ehailingScreen: StyleSheet.create({
+  // layout
+  container: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    backgroundColor: colors.background,
+  },
+
+  // text
+  title: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    marginTop: 12,
+    marginBottom: 10,
+  },
+  subtitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.textPrimary,
+    marginTop: 6,
+    marginBottom: 8,
+  },
+  subtitleSmall: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: colors.textSecondary,
+  },
+
+  // rows
+  rowBetween: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginVertical: 8,
+  },
+
+  // inputs
+  inputRow: { marginBottom: 8 },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.cardBackground,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: colors.borderColor, // visible border
+  },
+  input: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+    color: colors.textPrimary, // ensure text visible on light/dark
+  },
+
+  // map
+  mapWrapper: {
+    width: "100%",
+    height: height * 0.35,
+    borderRadius: 16,
+    overflow: "hidden",
+    marginVertical: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderColor,
+  },
+  map: { flex: 1 },
+
+  // ride cards (bigger)
+  cardLarge: {
+    backgroundColor: colors.cardBackground,
+    padding: 16,
+    borderRadius: 14,
+    marginRight: 14,
+    minWidth: width * 0.55,
+    shadowColor: colors.shadowColor,
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.borderColor,
+  },
+  cardSelected: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+    backgroundColor: colors.surface,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  cardMeta: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+
+  // buttons
+  button: {
+    backgroundColor: colors.primary,
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 12,
+  },
+  buttonDisabled: {
+    backgroundColor: colors.primaryLight,
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+
+  // small pill for online toggle
+  smallPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.borderColor,
+  },
+
+  sheet: {
+  position: "absolute",
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: colors.cardBackground,
+  borderTopLeftRadius: 16,
+  borderTopRightRadius: 16,
+  borderWidth: 1,
+  borderColor: colors.borderColor,
+  // elevation + shadow
+  shadowColor: colors.shadowColor,
+  shadowOpacity: 0.18,
+  shadowRadius: 12,
+  shadowOffset: { width: 0, height: -4 },
+  elevation: 20,
+  paddingHorizontal: 16,
+  paddingTop: 6,
+  zIndex: 50,
+},
+
+grabberArea: {
+  alignItems: "center",
+  paddingVertical: 8,
+},
+
+grabber: {
+  width: 42,
+  height: 4,
+  borderRadius: 2,
+  opacity: 0.5,
+},
+
+}),
+
+
+beADriverScreen: StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+    padding: 16,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 12,
+    color: colors.text,
+  },
+  label: {
+    fontSize: 13,
+    color: colors.muted || "#6B7280",
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  input: {
+    backgroundColor: colors.card || "#F3F4F6",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    color: colors.text,
+  },
+  uploadRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 12,
+  },
+  uploadBox: {
+    flex: 1,
+    backgroundColor: colors.card || "#F3F4F6",
+    borderRadius: 10,
+    padding: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  uploadText: {
+    color: colors.text,
+    fontWeight: "600",
+  },
+  previewRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10,
+  },
+  preview: {
+    width: 90,
+    height: 90,
+    borderRadius: 8,
+  },
+  submitButton: {
+    backgroundColor: colors.primary || "#2563EB",
+    borderRadius: 12,
+    alignItems: "center",
+    paddingVertical: 14,
+    marginTop: 16,
+  },
+  submitText: {
+    color: colors.buttonText || "#fff",
+    fontWeight: "700",
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  hint: {
+    fontSize: 12,
+    color: colors.muted || "#6B7280",
+    marginTop: 10,
+  },
+  safeArea: {
+  flex: 1,
+  backgroundColor: colors.background,
+},
+
+}),
+
+
 chatRoomScreen: StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
   },
 
-  /** HEADER */
  
   /** HEADER */
   headerContainer: {
